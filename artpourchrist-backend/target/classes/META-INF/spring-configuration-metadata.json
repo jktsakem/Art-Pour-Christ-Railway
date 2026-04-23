@@ -1,0 +1,60 @@
+{
+  "groups": [
+    {
+      "name": "app",
+      "type": "com.artpourchrist.config.AppProperties",
+      "sourceType": "com.artpourchrist.config.AppProperties"
+    },
+    {
+      "name": "app.admin",
+      "type": "com.artpourchrist.config.AppProperties$Admin",
+      "sourceType": "com.artpourchrist.config.AppProperties",
+      "sourceMethod": "public com.artpourchrist.config.AppProperties.Admin getAdmin() "
+    },
+    {
+      "name": "app.contact",
+      "type": "com.artpourchrist.config.AppProperties$Contact",
+      "sourceType": "com.artpourchrist.config.AppProperties",
+      "sourceMethod": "public com.artpourchrist.config.AppProperties.Contact getContact() "
+    },
+    {
+      "name": "app.cors",
+      "type": "com.artpourchrist.config.AppProperties$Cors",
+      "sourceType": "com.artpourchrist.config.AppProperties",
+      "sourceMethod": "public com.artpourchrist.config.AppProperties.Cors getCors() "
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.admin.email",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties$Admin"
+    },
+    {
+      "name": "app.admin.password",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties$Admin"
+    },
+    {
+      "name": "app.base-url",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties"
+    },
+    {
+      "name": "app.contact.from",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties$Contact"
+    },
+    {
+      "name": "app.cors.allowed-origins",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties$Cors"
+    },
+    {
+      "name": "app.upload-dir",
+      "type": "java.lang.String",
+      "sourceType": "com.artpourchrist.config.AppProperties"
+    }
+  ],
+  "hints": []
+}
