@@ -22,11 +22,14 @@ public class ContactService {
 
     private final ContactRepository repository;
 
-    @Value("${resend.api-key:}")
-    private String resendApiKey;
+    @Value("${brevo.api-key:}")
+    private String brevoApiKey;
 
-    @Value("${app.contact.from:onboarding@resend.dev}")
+    @Value("${app.contact.from.email:ichigamisenku07@gmail.com}")
     private String fromEmail;
+
+    @Value("${app.contact.from.name:Art pour Christ}")
+    private String fromName;
 
     private static final String[] RECIPIENTS = {
         "dolcenicky2004@icloud.com",
@@ -44,7 +47,7 @@ public class ContactService {
             .message(request.getMessage())
             .build());
 
-        if (!resendApiKey.isBlank()) {
+        if (!brevoApiKey.isBlank()) {
             try {
                 sendEmail(saved);
                 log.info("Email de contact envoyé pour le message id={}", saved.getId());
@@ -52,7 +55,7 @@ public class ContactService {
                 log.error("Échec de l'envoi de l'email de contact (message sauvegardé quand même) : {}", e.getMessage());
             }
         } else {
-            log.warn("RESEND_API_KEY non configuré — email non envoyé pour le message id={}", saved.getId());
+            log.warn("BREVO_API_KEY non configuré — email non envoyé pour le message id={}", saved.getId());
         }
 
         return toResponse(saved);
@@ -60,7 +63,7 @@ public class ContactService {
 
     private void sendEmail(ContactMessage msg) throws Exception {
         String toJson = Arrays.stream(RECIPIENTS)
-            .map(r -> "\"" + r + "\"")
+            .map(r -> "{\"email\":\"" + r + "\"}")
             .collect(Collectors.joining(",", "[", "]"));
 
         String subject = "[Art pour Christ] Nouveau message : " + msg.getSubject()
@@ -68,23 +71,24 @@ public class ContactService {
 
         String body = """
             {
-              "from": "%s",
+              "sender": {"email": "%s", "name": "%s"},
               "to": %s,
+              "replyTo": {"email": "%s"},
               "subject": "%s",
-              "text": %s,
-              "reply_to": "%s"
+              "textContent": %s
             }
             """.formatted(
                 fromEmail,
+                fromName,
                 toJson,
+                msg.getEmail(),
                 subject.replace("\"", "\\\""),
-                toJsonString(buildEmailBody(msg)),
-                msg.getEmail()
+                toJsonString(buildEmailBody(msg))
             );
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create("https://api.resend.com/emails"))
-            .header("Authorization", "Bearer " + resendApiKey)
+            .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+            .header("api-key", brevoApiKey)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build();
@@ -93,7 +97,7 @@ public class ContactService {
             .send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() >= 400) {
-            throw new RuntimeException("Resend API error " + response.statusCode() + ": " + response.body());
+            throw new RuntimeException("Brevo API error " + response.statusCode() + ": " + response.body());
         }
     }
 
