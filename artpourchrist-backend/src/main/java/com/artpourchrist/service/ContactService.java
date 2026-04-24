@@ -5,11 +5,15 @@ import com.artpourchrist.model.ContactMessage;
 import com.artpourchrist.repository.ContactRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,10 +22,10 @@ public class ContactService {
 
     private final ContactRepository repository;
 
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
+    @Value("${resend.api-key:}")
+    private String resendApiKey;
 
-    @Value("${app.contact.from:noreply@artpourchrist.com}")
+    @Value("${app.contact.from:onboarding@resend.dev}")
     private String fromEmail;
 
     private static final String[] RECIPIENTS = {
@@ -40,7 +44,7 @@ public class ContactService {
             .message(request.getMessage())
             .build());
 
-        if (mailSender != null) {
+        if (!resendApiKey.isBlank()) {
             try {
                 sendEmail(saved);
                 log.info("Email de contact envoyé pour le message id={}", saved.getId());
@@ -48,21 +52,59 @@ public class ContactService {
                 log.error("Échec de l'envoi de l'email de contact (message sauvegardé quand même) : {}", e.getMessage());
             }
         } else {
-            log.warn("JavaMailSender non configuré — email non envoyé pour le message id={}", saved.getId());
+            log.warn("RESEND_API_KEY non configuré — email non envoyé pour le message id={}", saved.getId());
         }
 
         return toResponse(saved);
     }
 
-    private void sendEmail(ContactMessage msg) {
-        SimpleMailMessage email = new SimpleMailMessage();
-        email.setFrom(fromEmail);
-        email.setReplyTo(msg.getEmail());
-        email.setTo(RECIPIENTS);
-        email.setSubject("[Art pour Christ] Nouveau message : " + msg.getSubject()
-            + " — " + msg.getFirstName() + " " + msg.getLastName());
-        email.setText(buildEmailBody(msg));
-        mailSender.send(email);
+    private void sendEmail(ContactMessage msg) throws Exception {
+        String toJson = Arrays.stream(RECIPIENTS)
+            .map(r -> "\"" + r + "\"")
+            .collect(Collectors.joining(",", "[", "]"));
+
+        String subject = "[Art pour Christ] Nouveau message : " + msg.getSubject()
+            + " — " + msg.getFirstName() + " " + msg.getLastName();
+
+        String body = """
+            {
+              "from": "%s",
+              "to": %s,
+              "subject": "%s",
+              "text": %s,
+              "reply_to": "%s"
+            }
+            """.formatted(
+                fromEmail,
+                toJson,
+                subject.replace("\"", "\\\""),
+                toJsonString(buildEmailBody(msg)),
+                msg.getEmail()
+            );
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.resend.com/emails"))
+            .header("Authorization", "Bearer " + resendApiKey)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient()
+            .send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() >= 400) {
+            throw new RuntimeException("Resend API error " + response.statusCode() + ": " + response.body());
+        }
+    }
+
+    private String toJsonString(String text) {
+        return "\"" + text
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+            + "\"";
     }
 
     private String buildEmailBody(ContactMessage msg) {
